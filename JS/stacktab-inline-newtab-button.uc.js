@@ -113,6 +113,13 @@
     const isInline = (btn) =>
       !!btn && !!document.getElementById("floorp-stack-items")?.contains(btn);
 
+    // Focus the address bar after a new blank tab opens, like native new-tab —
+    // Floorp's in-stack open (addTabToActiveGroup) doesn't. Deferred so it runs
+    // after the tab switch settles.
+    const focusUrlbar = () => {
+      try { const u = window.gURLBar; if (u) { u.focus(); u.select?.(); } } catch (e) {}
+    };
+
     // The button opens a tab in its `click` handler (addTabToActiveGroup) — and
     // this Floorp fires `click` for BOTH middle (button 1) and right (button 2),
     // not just left. So gate on the button number:
@@ -127,7 +134,10 @@
       const btn = btnOf(e);
       if (!btn) return;
       if (e.button === 2) { e.preventDefault(); e.stopPropagation(); return; }
-      if (e.button === 1 && isInline(btn)) e.stopPropagation();
+      if (e.button === 1 && isInline(btn)) { e.stopPropagation(); return; }
+      // Left-click, or middle-click while parked: the button opens the in-stack
+      // tab itself, but Floorp doesn't focus the address bar — do it.
+      if (e.button === 0 || e.button === 1) setTimeout(focusUrlbar, 0);
     }, true);
 
     // Belt-and-suspenders for right-click: swallow the right-button auxclick and
@@ -161,6 +171,7 @@
         triggeringPrincipal: SYS(),
       });
       gBrowser.selectedTab = t; // foreground, like the empty-space middle-click
+      setTimeout(focusUrlbar, 0);
     }
     for (const type of ["click", "auxclick"]) {
       window.addEventListener(type, function (e) {

@@ -21,6 +21,13 @@
   const groupOf = (tab) =>
     tab?.closest?.("tab-group[data-floorp-stack]") || tab?.group || null;
 
+  // Focus the address bar after opening a blank tab, like native new-tab does
+  // (our explicit opens / Floorp's in-stack open don't). Deferred so it runs
+  // after the tab switch settles.
+  const focusUrlbar = () => {
+    try { const u = window.gURLBar; if (u) { u.focus(); u.select?.(); } } catch (e) {}
+  };
+
   // Move an already-open tab into `group`, landing at the stack's end. The
   // group-adoption API is version-specific, so try known shapes and report
   // which one worked (or none, so breakage is easy to localize).
@@ -89,6 +96,7 @@
           triggeringPrincipal: Services.scriptSecurityManager.getSystemPrincipal(),
         });
         gBrowser.selectedTab = newTab;
+        setTimeout(focusUrlbar, 0);
         return;
       }
     }, true);
@@ -110,8 +118,10 @@
       e.preventDefault();
       e.stopImmediatePropagation();
 
-      const nativeNewTab = () =>
+      const nativeNewTab = () => {
         document.getElementById("cmd_newNavigatorTab").doCommand();
+        setTimeout(focusUrlbar, 0);
+      };
 
       const group = stackGroupFromStrip(stackBlank);
       const afterCurrent =
@@ -137,6 +147,7 @@
       });
       const how = adoptToStackEnd(newTab, group);
       gBrowser.selectedTab = newTab; // foreground, like Ctrl+T / the + button
+      setTimeout(focusUrlbar, 0);    // focus the address bar, like native new-tab
       console.log("[stack-mc] new in-stack tab via", how);
     }, true);
 

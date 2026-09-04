@@ -34,6 +34,13 @@
 
   const SYS = () => Services.scriptSecurityManager.getSystemPrincipal();
 
+  // Native new-tab focuses the address bar so you can type immediately; our
+  // explicit addTab + adopt path doesn't, so restore it (deferred to run after
+  // the tab switch settles).
+  const focusUrlbar = () => {
+    try { const u = window.gURLBar; if (u) { u.focus(); u.select?.(); } } catch (e) {}
+  };
+
   // Only Floorp STACKS (tab-group[data-floorp-stack]); plain Firefox tab groups
   // are intentionally excluded so their new-tab behavior is left native.
   const stackOf = (tab) =>
@@ -73,6 +80,7 @@
       const newTab = gBrowser.addTab("about:newtab", { triggeringPrincipal: SYS() });
       const how = adoptToStackEnd(newTab, group);
       gBrowser.selectedTab = newTab; // foreground, like the native command
+      setTimeout(focusUrlbar, 0);    // focus the address bar, like native new-tab
       console.log(LOG, "opened in current stack via", how);
       return true;
     }

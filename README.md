@@ -2,7 +2,7 @@
 The tab stack implementation leaves a lot to be desired. They're clunky and frustrating to use. With the help of ~~vibecoding~~ Agentic Enginnering I've created a set of userscripts (and an optional stylesheet) to make tab stacks practical. The end goal is to make tab stacks as seamless and practical as global tabs, like Vivaldi. The scripts and stylesheet are modular and self-contained, pick and choose what to add.
 
 # Recommended
-**stacktab-mouse-improvements.uc.js** - The single biggest improvement. Context-aware middle click to open a new tab. New tabs will open in the stack or global tabs depending on where you click, fixes opening on right click, as well as drag and drop support for text/images/whatever. Dragging tabs from other windows aren't yet supported, but planned.
+**stacktab-mouse-improvements.uc.js** - The single biggest improvement. Context-aware middle click to close tabs or open a new one. New tabs will open in the stack or global tabs depending on where you click, fixes opening on right click, as well as drag and drop support for text/images/whatever. Dragging tabs from other windows aren't yet supported, but planned.
 
 **stacktab-hotkey-opens-in-stack.uc.js** - Makes the new tab hotkey & gesture context-aware. New tabs are opened in the currently active stack or in the global tab area, depending on which you're using.
 

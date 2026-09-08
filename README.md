@@ -22,4 +22,4 @@ The tab stack implementation leaves a lot to be desired. They're clunky and frus
 
 # Installation
 
-Install [fx-autoconfig](url=https://github.com/MrOtherGuy/fx-autoconfig) then copy the JS folder and optionally userChrome.css to your profile -> chrome folder (you'll know where it is after installing fx-autoconfig). Delete unwanted scripts as you wish.
+Install fx-autoconfig https://github.com/MrOtherGuy/fx-autoconfig then copy the JS folder and optionally userChrome.css to your profile -> chrome folder (you'll know where it is after installing fx-autoconfig). Delete unwanted scripts as you wish.

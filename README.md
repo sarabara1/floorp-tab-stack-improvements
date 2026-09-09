@@ -20,7 +20,7 @@ The tab stack implementation leaves a lot to be desired. They're clunky and frus
 
 **stacktab-close-last-becomes-newtab.uc.js** - Makes closing the last tab in a stack switch to a new tab page instead of removing the stack. It still allows the stack to be closed on the stack handle itself. This mimics global window behavior. Useful for people who like to keep long-standing stacks and don't want to be careful about accidentally closing one.
 
-**floorp-about-page-singletons.uc.js** - Makes the Floorp hub a singleton like the rest of the about: pages. This makes them open in the global tabs and the browser will prefer to switch to existing hubs instead of opening a new one. Simply adds cohesion with the rest of Firefox.
+**floorp-about-page-singletons.uc.js** - This is the odd one out. It makes the Floorp hub a singleton like the rest of the about: pages. This makes them open in the global tabs and the browser will prefer to switch to existing hubs instead of opening a new one. Simply adds cohesion with the rest of Firefox.
 
 **userChrome.css** - Makes stacks a bit more compact, between the width of a group and normal tab. 
 

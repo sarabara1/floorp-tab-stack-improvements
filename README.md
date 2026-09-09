@@ -16,6 +16,8 @@ The tab stack implementation leaves a lot to be desired. They're clunky and frus
 
 **stacktab-newtab-expand-animation.uc.js** - Adds the opening animation to stack tabs. Purely cosmetic but adds missing polish.
 
+**stacktab-unload-context-menu-item.uc.js** - Adds a context menu item for stacks and groups to unload the tabs they contain.
+
 **floorp-about-page-singletons.uc.js** - Makes the Floorp hub a singleton like the rest of the about: pages. This makes them open in the global tabs and the browser will prefer to switch to existing hubs instead of opening a new one. Simply adds cohesion with the rest of Firefox.
 
 **userChrome.css** - Makes stacks a bit more compact, between the width of a group and normal tab. 

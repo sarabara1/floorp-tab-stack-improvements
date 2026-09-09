@@ -33,7 +33,7 @@
 // (2) IGNORE NON-LEFT CLICKS — once inlined, the button sits inside
 //     #floorp-stack-items, so a middle-click on it hit BOTH the button's own
 //     new-tab action AND the stack-blank middle-click handler
-//     (stacktab-middleclick-improvements.uc.js) → two tabs. So on middle-click of the inlined
+//     (stacktab-mouse-improvements.uc.js) → two tabs. So on middle-click of the inlined
 //     button we suppress the button's OWN action (which fires on `click`) with
 //     stopPropagation — but NOT preventDefault, since that would also cancel the
 //     follow-up `auxclick` the middle-click handler uses to open the ONE tab.
@@ -125,7 +125,7 @@
     // not just left. So gate on the button number:
     //   - RIGHT (2) → always cut it: right-click should do nothing.
     //   - MIDDLE (1), button INLINED → cut the button's own action; the
-    //     middle-click pass-through (stacktab-middleclick-improvements.uc.js) opens the one
+    //     middle-click pass-through (stacktab-mouse-improvements.uc.js) opens the one
     //     tab on the follow-up `auxclick`. Parked → leave it, the button opens
     //     the tab itself. Either way, exactly one tab.
     // stopPropagation (NOT stopImmediatePropagation) so the sibling window

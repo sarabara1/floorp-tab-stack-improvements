@@ -1,5 +1,5 @@
 # Floorp Tab Stack Improvements 
-The tab stack implementation leaves a lot to be desired. They're clunky and frustrating to use. With the help of ~~vibecoding~~ Agentic Enginnering I've created a set of userscripts (and an optional stylesheet) to make tab stacks practical. The end goal is to make tab stacks as seamless and practical as global tabs, like Vivaldi. The scripts and stylesheet are modular and self-contained, pick and choose what to add.
+The tab stack implementation leaves a lot to be desired. They're clunky and frustrating to use. With the help of ~~vibecoding~~ Agentic Enginnering I've created a set of userscripts (and an optional stylesheet) to make tab stacks practical. The end goal is to make tab stacks as seamless and practical as global tabs, like Vivaldi. **The scripts and stylesheet are modular and self-contained, pick and choose what to add.**
 
 # Recommended
 **stacktab-mouse-improvements.uc.js** - The single biggest improvement. Context-aware middle click to close tabs or open a new one. New tabs will open in the stack or global tabs depending on where you click, fixes opening on right click, as well as drag and drop support for text/images/whatever. Dragging tabs from other windows aren't yet supported, but planned.
@@ -19,6 +19,8 @@ The tab stack implementation leaves a lot to be desired. They're clunky and frus
 **stacktab-unload-context-menu-item.uc.js** - Adds a context menu item for stacks and groups to unload the tabs they contain.
 
 **stacktab-close-last-becomes-newtab.uc.js** - Makes closing the last tab in a stack switch to a new tab page instead of removing the stack. It still allows the stack to be closed on the stack handle itself. This mimics global window behavior. Useful for people who like to keep long-standing stacks and don't want to be careful about accidentally closing one.
+
+**floorp-workspaces-scroll-switch.uc.js.** - Scroll over the workspaces button to quickly switch between them.
 
 **floorp-about-page-singletons.uc.js** - This is the odd one out. It makes the Floorp hub a singleton like the rest of the about: pages. This makes them open in the global tabs and the browser will prefer to switch to existing hubs instead of opening a new one. Simply adds cohesion with the rest of Firefox.
 

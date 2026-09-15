@@ -61,9 +61,20 @@
 
       // composedPath() pierces shadow DOM, so this works whether or not the
       // stack UI lives inside a shadow root.
-      const hit = e.composedPath().find(
+      const path = e.composedPath();
+      let hit = path.find(
         n => n && n.nodeType === 1 && n.id === "floorp-stack-scroller"
       );
+      // Wheeling over the overflow arrows / + button (siblings of the scroller in
+      // #floorp-stack-bar, so NOT in the scroller's own subtree) should scroll too,
+      // matching the global strip where the arrowscrollbox owns that whole area.
+      // Resolve the scroller from the retained one, or find it under the bar.
+      if (!hit) {
+        const bar = path.find(
+          n => n && n.nodeType === 1 && n.id === "floorp-stack-bar"
+        );
+        if (bar) hit = scroller || bar.querySelector?.("#floorp-stack-scroller");
+      }
       if (!hit) return;
 
       const raw = e.deltaY || e.deltaX;

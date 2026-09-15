@@ -10,8 +10,10 @@ The tab stack implementation leaves a lot to be desired. They're clunky and frus
 
 **stacktab-close-confirm.uc.js** - Adds a dialog when closing a stack or group if it contains multiple tabs just like windows if "Ask before closing multiple tabs" is enabled in your settings.
 
-**stacktab-overflow-scroll-speed.uc.js** - Scrolling overflowed tabs within a stack was frustratingly slow. This script makes it smoother and faster, similar to global tabs. It's not 1:1 but still a major improvement. WIP.
+**stacktab-overflow-scroll-speed.uc.js** - Scrolling overflowed tabs within a stack was frustratingly slow. This script makes scrolling behave like the global tabs.
 
+**stacktab-drag-edge-scroll.uc.js** - Allows stack area to auto-scroll while dragging tabs to the edge. Also adds continuous scroll while holding left click on the arrows.
+ 
 # Optional
 
 **stacktab-newtab-expand-animation.uc.js** - Adds the opening animation to stack tabs. Purely cosmetic but adds missing polish.

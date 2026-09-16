@@ -3,33 +3,34 @@
 // @include        main
 // ==/UserScript==
 
-// Mirrors Floorp's window-level behavior — closing the last tab in a window
-// just loads about:newtab instead of closing the window — for STACKS: trying to
-// close the last remaining tab in a `tab-group[data-floorp-stack]` navigates
-// that tab to about:newtab (keeping the stack alive) instead of removing it and
-// dissolving the stack. Closing the WHOLE stack (its X button, or middle-click
-// on the stack) is deliberately left alone.
+// Mirrors Floorp's window-level behavior — closing the last tab in a window loads
+// about:newtab instead of closing the window — for STACKS: closing the last tab in
+// a `tab-group[data-floorp-stack]` keeps the stack alive with a fresh about:newtab
+// instead of dissolving it. Closing the WHOLE stack (its X / middle-click) is left
+// alone. STACKS ONLY — plain Firefox tab groups still dissolve on their last tab.
 //
-// CHOKEPOINT — wrap gBrowser.removeTab. Every single-tab close funnels through
-// it (this project's middle-click handler, Ctrl+W, a per-tab close button, the
-// context-menu "Close Tab"), so one wrap covers them all. No other script in
-// this profile touches removeTab (the others wrap addTab), so this is collision-
-// free and load-order-independent.
+// HOW: just before the last stack tab is removed, drop a fresh about:newtab into
+// the same stack, then let the native gBrowser.removeTab close the original tab.
+// The stack survives because the replacement is already a member, and closing the
+// original through Firefox's normal path gives it a proper recently-closed entry —
+// Ctrl+Shift+T reopens it, back into the stack, with full history and correct
+// (newest-first) order.
 //
-// THE TRAP this guards against — whole-stack close ALSO reaches removeTab:
-//   removeTabGroup(group) -> removeTabs(group.tabs) -> removeTab(tab) per tab.
-// So a naive "never remove the last stack tab" guard would redirect the FINAL
-// tab of a closing stack to about:newtab and leave a stray one-tab stack behind.
-// A `bulk` re-entry guard (set while removeTabGroup/removeTabs run, plus a call-
-// stack check) suppresses the redirect for any bulk removal, so only a genuine
-// lone close of the last stack tab is redirected.
+// CHOKEPOINT — wrap gBrowser.removeTab, the single funnel for every one-tab close
+// (middle-click, Ctrl+W, close button, context menu). No other script wraps
+// removeTab, so this is collision-free and load-order-independent.
+//
+// BULK GUARD — a whole-stack close also reaches removeTab via
+// removeTabGroup(group) -> removeTabs(tabs) -> removeTab(tab). A `bulk` counter
+// (raised while those run) and a call-stack check suppress the replacement during
+// any multi-tab removal, so only a genuine lone close of the last stack tab is
+// handled. Composes with the confirm script (also wraps removeTabGroup) either way.
 
 (function () {
   const SYS = () => Services.scriptSecurityManager.getSystemPrincipal();
 
   // The stack group a tab belongs to, or null. STACKS ONLY — plain Firefox tab
-  // groups (the user's tier-2 fixed groups) are intentionally excluded, so
-  // closing the last tab in one still dissolves it natively.
+  // groups (the user's tier-2 fixed groups) are intentionally excluded.
   const stackOf = (tab) => tab?.closest?.("tab-group[data-floorp-stack]") || null;
 
   // Would `tab` be the last surviving tab in `group`? (Ignore tabs already
@@ -47,9 +48,8 @@
     return list.filter(t => t !== tab && !t.closing).length === 0;
   }
 
-  // Focus the address bar after the redirect, but only if the affected tab is
-  // the one you're looking at — matches native new-tab, without yanking focus
-  // when you close the last tab of a background stack.
+  // Focus the address bar for the replacement tab (matches opening a new tab), but
+  // only when we actually switched to it.
   function maybeFocusUrlbar(tab) {
     if (gBrowser.selectedTab !== tab) return;
     setTimeout(() => {
@@ -57,23 +57,8 @@
     }, 0);
   }
 
-  // Navigate the last stack tab to about:newtab IN PLACE (same tab, so the stack
-  // structure never churns and no group animation replays).
-  function blankInPlace(tab) {
-    const browser = gBrowser.getBrowserForTab(tab);
-    try {
-      browser.loadURI(Services.io.newURI("about:newtab"), { triggeringPrincipal: SYS() });
-    } catch (e) {
-      // Older/newer signature fallback.
-      try { browser.fixupAndLoadURIString("about:newtab", { triggeringPrincipal: SYS() }); }
-      catch (e2) { console.warn("[stack-lasttab] could not load about:newtab", e2); return false; }
-    }
-    maybeFocusUrlbar(tab);
-    return true;
-  }
-
   function init() {
-    // ---- bulk guard: don't redirect while a group/multi-tab removal runs ----
+    // ---- bulk guard: don't add a replacement during a group/multi-tab removal ----
     let bulk = 0;
     const guardBulk = (name) => {
       const orig = gBrowser[name];
@@ -85,15 +70,11 @@
       };
       return true;
     };
-    // removeTabGroup -> removeTabs -> removeTab is the whole-stack close path;
-    // removeTabs also backs "close other/​to-the-right" batches. Wrapping both
-    // means the last stack tab in ANY multi-close is removed, not redirected.
     const wrappedGroup = guardBulk("removeTabGroup");
     const wrappedTabs  = guardBulk("removeTabs");
 
-    // Backup discriminator, in case a build's minification hides the wrapper
-    // above (same call-stack trick as the gesture script's executeGestureAction
-    // check): if a bulk-removal frame is on the stack, treat it as bulk.
+    // Backup discriminator if minification hides the wrappers above: a bulk-removal
+    // frame on the call stack means we're inside a multi-tab close.
     const inBulkStack = () => {
       try {
         const s = new Error().stack || "";
@@ -101,19 +82,59 @@
       } catch (e) { return false; }
     };
 
-    // ---- the intercept ----
     const origRemoveTab = gBrowser.removeTab;
+
+    // Make `tab` a live member of `group` at the stack's end. Group-adoption API is
+    // version-specific; try known shapes. Returns true if it joined.
+    function adoptToGroup(tab, group) {
+      try {
+        if (typeof group.addTabs === "function") { group.addTabs([tab]); return true; }
+        if (typeof gBrowser.moveTabToGroup === "function") { gBrowser.moveTabToGroup(tab, group); return true; }
+        if (typeof gBrowser.addTabToGroup === "function") { gBrowser.addTabToGroup(group, tab); return true; }
+      } catch (e) { console.warn("[stack-lasttab] adopt-to-group error", e); return false; }
+      return false;
+    }
+
+    // Drop a fresh about:newtab into `group` so the stack survives the imminent
+    // native close of `tab`. If `tab` was selected, foreground the replacement so
+    // closing `tab` doesn't flash its content. Returns true if a replacement is in
+    // place (proceed with the native close), false to fall back to a plain removal.
+    function placeReplacement(tab, group) {
+      const wasSelected = gBrowser.selectedTab === tab;
+      let newTab = null;
+      try {
+        newTab = gBrowser.addTab("about:newtab", { triggeringPrincipal: SYS() });
+        if (!newTab) return false;
+        if (!adoptToGroup(newTab, group)) {
+          // Couldn't join the stack — remove the replacement rather than leave a
+          // stray global tab, and let the close fall through to native.
+          origRemoveTab.call(gBrowser, newTab, { animate: false });
+          console.warn("[stack-lasttab] no group-adopt API; replacement removed, closing natively");
+          return false;
+        }
+        if (wasSelected) {
+          gBrowser.selectedTab = newTab;   // foreground so closing `tab` doesn't flash
+          maybeFocusUrlbar(newTab);
+        }
+        return true;
+      } catch (e) {
+        console.warn("[stack-lasttab] could not place replacement newtab", e);
+        try { if (newTab && !newTab.closing) origRemoveTab.call(gBrowser, newTab, { animate: false }); } catch (e2) {}
+        return false;
+      }
+    }
+
+    // ---- the intercept ----
     gBrowser.removeTab = function (tab, options) {
       try {
         if (bulk === 0 && tab && !tab.pinned && !tab.closing) {
           const group = stackOf(tab);
           if (group && isLastInStack(tab, group) && !inBulkStack()) {
-            if (blankInPlace(tab)) {
-              console.log("[stack-lasttab] last tab in stack → about:newtab (stack kept)");
-              return; // suppress the removal
+            // Keep the stack alive with a replacement, then fall through so the
+            // native removal closes `tab` for real (proper recently-closed entry).
+            if (placeReplacement(tab, group)) {
+              console.log("[stack-lasttab] last tab in stack → placed replacement new-tab; closing original natively");
             }
-            // If the redirect somehow failed, fall through and remove normally
-            // (fail safe: never leave the close silently doing nothing).
           }
         }
       } catch (e) {
@@ -123,7 +144,7 @@
     };
 
     console.log(
-      "[stack-lasttab] loaded (removeTab wrap; bulk guard: " +
+      "[stack-lasttab] loaded (replacement-tab + native close; bulk guard: " +
       (wrappedGroup ? "removeTabGroup " : "") +
       (wrappedTabs ? "removeTabs " : "") + "+ stack-scan)"
     );

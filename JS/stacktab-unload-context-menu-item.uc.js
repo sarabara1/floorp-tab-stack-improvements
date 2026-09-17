@@ -124,20 +124,17 @@
     // phase so it runs before Floorp opens the popup.
     window.addEventListener("mousedown", (e) => { lastCtxTarget = e.target; }, true);
 
-    // Lazily add our item (+ a separator) to a given popup, once.
+    // Lazily add our item to the top of a given popup, once.
     function ensureItem(popup) {
       const existing = popup.getElementsByClassName("uc-unload-group-item")[0];
       if (existing) return existing;
-      const sep = document.createXULElement("menuseparator");
-      sep.className = "uc-unload-group-sep";
       const item = document.createXULElement("menuitem");
       item.className = "uc-unload-group-item";
       item.addEventListener("command", () => {
         if (!pendingGroup) return;
         console.log("[tab-unload] unloaded", unloadGroup(pendingGroup), "in group/stack");
       });
-      popup.appendChild(sep);
-      popup.appendChild(item);
+      popup.insertBefore(item, popup.firstChild);
       return item;
     }
 

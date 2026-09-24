@@ -1,0 +1,12 @@
+/* ==UserScript==
+// @description Makes the stacks a bit more compact.
+// @long-description
+*/
+
+@charset "UTF-8";
+@-moz-document url(chrome://browser/content/browser.xhtml) {
+	#tabbrowser-tabs tab-group[data-floorp-stack] > .tab-group-label-container {
+	  flex: none !important;
+	  min-width: 150px !important;
+	}
+}

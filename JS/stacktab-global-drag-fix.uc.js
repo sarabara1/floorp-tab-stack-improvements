@@ -54,6 +54,10 @@
 // a chip and the caret never shows. While a stack-bar tab is dragged, only the
 // middle half of each chip is a hit target (its ::before); near the edges the
 // pointer reaches the strip, and Floorp places the tab on that side of the chip.
+// Floorp also treats an expanded tab group as one block, so a stack-bar tab
+// could only land before or after it. Over a group, the caret moves to the
+// in-group spot a global tab would get, and after Floorp's drop the tab is
+// moved there.
 
 (function () {
   const TAB_DROP_TYPE = "application/x-moz-tabbrowser-tab";
@@ -242,6 +246,12 @@
     // ---- drag start --------------------------------------------------------
     const origStart = dnd.startTabDrag;
     dnd.startTabDrag = function (event, tab, options) {
+      // Floorp starts stack-bar drags here with fromTabList (so does the
+      // all-tabs menu, from inside its panel).
+      if (options?.fromTabList && isStackMember(tab) &&
+          tab.ownerDocument === document && !event?.target?.closest?.("panel")) {
+        beginProxyDrag(tab);
+      }
       const eligible = !options?.fromTabList && !tabs.verticalMode &&
         tab?.ownerDocument === document && !isStackMember(tab);
       if (!eligible) return origStart.apply(this, arguments);
@@ -267,16 +277,88 @@
       if (active || tabs.hasAttribute(ACTIVE_ATTR)) endDrag();
     }, true);
 
-    // ---- stack-bar drags: chip edges belong to the strip -------------------
+    // ---- stack-bar drags ----------------------------------------------------
+    // Started from the startTabDrag hook: a drag from a proxy the stack bar has
+    // just re-rendered away never reaches window dragstart listeners.
+    let proxyDrag = null;   // { tab, into, fixQueued }
     let proxyDragAt = 0;
-    const endProxyDrag = () => tabs.removeAttribute(PROXY_ATTR);
-    window.addEventListener("dragstart", (event) => {
-      if (!event.target?.closest?.(".floorp-stack-tab")) return;
+
+    function beginProxyDrag(tab) {
+      proxyDrag = { tab, into: null, fixQueued: false };
       proxyDragAt = performance.now();
-      tabs.setAttribute(PROXY_ATTR, "");
-    }, true);
+      tabs.setAttribute(PROXY_ATTR, ""); // chip edges belong to the strip
+    }
+    const endProxyDrag = () => {
+      tabs.removeAttribute(PROXY_ATTR);
+      proxyDrag = null;
+    };
     window.addEventListener("dragend", endProxyDrag, true);
     window.addEventListener(PROXY_DRAG_END_EVENT, endProxyDrag);
+
+    // Into an expanded group: the spot Firefox would use for a tab under the
+    // pointer. Over a member, its near side; over the label's trailing half,
+    // the group's start. The label's leading half is "before the group", which
+    // Floorp already handles. Returns { ref, before, x } or null.
+    function spotInGroup(x) {
+      for (const g of gBrowser.tabGroups) {
+        if (isStack(g) || g.collapsed || g.style.display === "none") continue;
+        const members = g.tabsAndSplitViews.filter(el => el.visible);
+        const labelBox = g.labelElement?.closest(".tab-group-label-container");
+        if (!members.length || !labelBox) continue;
+        const lr = labelBox.getBoundingClientRect();
+        const lastRect = members.at(-1).getBoundingClientRect();
+        if (x < lr.left || x > lastRect.right) continue;
+        if (x < lr.left + lr.width / 2) return null;
+        for (const el of members) {
+          const r = el.getBoundingClientRect();
+          if (x < r.left + r.width / 2) return { ref: el, before: true, x: r.left };
+        }
+        return { ref: members.at(-1), before: false, x: lastRect.right };
+      }
+      return null;
+    }
+
+    // Floorp's strip caret (showStripDropLine), moved to the in-group spot.
+    // Drawn in a frame callback so it lands after Floorp's own dragover
+    // listener, whichever order the two were registered in.
+    function drawGroupCaret() {
+      const into = proxyDrag?.into;
+      const ind = tabs.querySelector(".tab-drop-indicator");
+      if (!into || !ind) return;
+      const rect = tabs.arrowScrollbox.getBoundingClientRect();
+      ind.hidden = false;
+      ind.style.transform = `translateX(${Math.round(into.x - rect.left + ind.clientWidth / 2)}px)`;
+    }
+
+    window.addEventListener("dragover", (event) => {
+      if (!proxyDrag) return;
+      const inStrip = !!event.target?.closest?.("#TabsToolbar");
+      proxyDrag.into = inStrip ? spotInGroup(event.clientX) : null;
+      if (proxyDrag.into) requestAnimationFrame(drawGroupCaret);
+    }, true);
+
+    // Floorp's strip drop ungroups the tab and places it before/after the whole
+    // group, inside its drop listener. The first move it makes queues the
+    // correction, which runs once that listener returns — before repaint,
+    // dragend, or anything timer-based (e.g. the multiselect gather).
+    function onProxyTabMoved(tab) {
+      const d = proxyDrag;
+      if (!d || tab !== d.tab || !d.into || d.fixQueued) return;
+      d.fixQueued = true;
+      const { ref, before } = d.into;
+      queueMicrotask(() => {
+        try {
+          if (!ref.isConnected || !tab.isConnected || ref === tab) return;
+          if (before) gBrowser.moveTabBefore(tab, ref);
+          else gBrowser.moveTabAfter(tab, ref);
+        } catch (e) {
+          console.error("[stack-global-drag] drop into group:", e);
+        }
+      });
+    }
+    tabs.addEventListener("TabMove", (e) => onProxyTabMoved(e.target));
+    // Dispatched on the group it left, with the tab as detail.
+    window.addEventListener("TabUngrouped", (e) => onProxyTabMoved(e.detail));
 
     // A drag that ends without a dragend (a stack-bar drag's source node can be
     // re-rendered away mid-drag) must not leave chips unclickable. The platform

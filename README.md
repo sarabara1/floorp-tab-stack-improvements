@@ -4,7 +4,7 @@ The tab stack implementation leaves a lot to be desired. They're clunky and frus
 # Recommended
 **stacktab-global-drag-fix.uc.js** - Highly recommended. Fixes the dragging of stacks and tabs on the global tab bar. Tabs and stacks can be moved around smoothly without ordering and merge issues. Fixes tabs being merged with stacks when placed after it. Fixes stack tabs so they can be placed between stacks.
 
-**stacktab-mouse-improvements.uc.js** - Context-aware middle click to close tabs or open a new one. New tabs will open in the stack or global tabs depending on where you click, fixes opening on right click, as well as drag and drop support for text/images/whatever. Dragging tabs from other windows aren't yet supported, but planned.
+**stacktab-mouse-improvements.uc.js** - Context-aware middle click on empty tab bar space to open a new tab. New tabs will open in the stack or global tabs depending on where you click, as well as drag and drop support for text/images/whatever. Dragging tabs from other windows aren't yet supported, but planned.
 
 **stacktab-hotkey-opens-in-stack.uc.js** - Makes the new tab hotkey & gesture context-aware. New tabs are opened in the currently active stack or in the global tab area, depending on which you're using.
 

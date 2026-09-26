@@ -119,12 +119,114 @@
     return false;
   }
 
-  // Handle an external text/link drop on a stack strip. If `targetTab` is set
-  // (dropped onto an existing tab), the first item replaces that tab; anything
-  // else — and drops on blank strip area — opens new tab(s) at the stack's end.
+  // ---- where an external drop lands on a stack strip ----
+  // Same rules as the global tab strip (tabbrowser drag-and-drop.js): over the
+  // middle half of a tab, the drop replaces that tab; anywhere else it opens
+  // a new tab in the gap nearest the pointer, marked by the drop caret. A
+  // split view counts as one item, so nothing lands between its panes.
+  //   → { replace: tab } | { before: tab, x } | { after: tab, x } | { end: true }
+  // `x` is the gap's client x, for the caret.
+
+  // Proxies grouped into drop items: a split's panes form one item.
+  function dropItems(proxies) {
+    const items = [];
+    for (const p of proxies) {
+      const pos = p.getAttribute("data-split-position");
+      const prev = items.at(-1)?.at(-1);
+      if ((pos === "middle" || pos === "last") && prev?.hasAttribute("data-split-position")) {
+        items.at(-1).push(p);
+      } else {
+        items.push([p]);
+      }
+    }
+    return items;
+  }
+
+  function itemRect(item) {
+    const a = item[0].getBoundingClientRect();
+    const b = item.at(-1).getBoundingClientRect();
+    return { left: Math.min(a.left, b.left), right: Math.max(a.right, b.right) };
+  }
+
+  function stackDropSpot(e, strip) {
+    const items = dropItems(strip.querySelectorAll(".floorp-stack-tab"));
+    if (!items.length) return { end: true };
+    const rtl = window.RTL_UI;
+    const x = e.clientX;
+
+    const overProxy = e.target.closest?.(".floorp-stack-tab");
+    if (overProxy) {
+      const r = itemRect(items.find(item => item.includes(overProxy)));
+      const w = r.right - r.left;
+      if (x >= r.left + w * 0.25 && x <= r.left + w * 0.75) {
+        const tab = realTabForVisual(overProxy);
+        if (tab) return { replace: tab };
+      }
+    }
+
+    for (const item of items) {
+      const r = itemRect(item);
+      if (rtl ? x > (r.left + r.right) / 2 : x < (r.left + r.right) / 2) {
+        const tab = realTabForVisual(item[0]);
+        if (tab) return { before: tab, x: rtl ? r.right : r.left };
+      }
+    }
+    const last = items.at(-1);
+    const r = itemRect(last);
+    const tab = realTabForVisual(last.at(-1));
+    return tab ? { after: tab, x: rtl ? r.left : r.right } : { end: true };
+  }
+
+  // The drop caret: Firefox's own tab-drag-indicator image, positioned over
+  // the stack bar (Floorp gives #floorp-stack-bar position: relative) and
+  // clamped to the visible strip. Dragover fires continuously while over a
+  // target, so a short watchdog hides it once dragovers stop — including
+  // when an OS file drag leaves the window, which fires no dragend here.
+  const CARET_ID = "uc-stack-drop-caret";
+  const CARET_CSS = `
+    #${CARET_ID} {
+      position: absolute;
+      inset-block: 0;
+      width: 12px;
+      background: url(chrome://browser/skin/tabbrowser/tab-drag-indicator.svg) no-repeat center;
+      pointer-events: none;
+      z-index: 3;
+    }
+  `;
+  let caretWatchdog = null;
+
+  function hideCaret() {
+    clearTimeout(caretWatchdog);
+    const caret = document.getElementById(CARET_ID);
+    if (caret) caret.hidden = true;
+  }
+
+  function showCaret(x) {
+    const bar = document.getElementById("floorp-stack-bar");
+    const scroller = document.getElementById("floorp-stack-scroller");
+    if (!bar || x == null) return hideCaret();
+    let caret = document.getElementById(CARET_ID);
+    if (!caret || caret.parentNode !== bar) {
+      caret?.remove();
+      caret = document.createXULElement("hbox");
+      caret.id = CARET_ID;
+      bar.append(caret);
+    }
+    const view = (scroller ?? bar).getBoundingClientRect();
+    const clamped = Math.min(Math.max(x, view.left), view.right);
+    caret.style.left = `${Math.round(clamped - bar.getBoundingClientRect().left - 6)}px`;
+    caret.hidden = false;
+    clearTimeout(caretWatchdog);
+    caretWatchdog = setTimeout(hideCaret, 250);
+  }
+
+  // Handle an external text/link/file drop on a stack strip at `spot` (from
+  // stackDropSpot): the first item replaces the target tab for a replace
+  // drop, and the rest open as new tabs after it; otherwise every item opens
+  // as a new tab in the chosen gap, in order.
   // The dataTransfer is only valid synchronously, so extract everything
   // (links, principal, csp) before the first await.
-  async function handleStackDrop(event, group, targetTab) {
+  async function handleStackDrop(event, group, spot) {
     // Extract everything off the (soon-invalid) dataTransfer synchronously.
     let urls = [];
     try {
@@ -146,28 +248,46 @@
     }
 
     let selectAfter = null;
-    let first = true;
+    let previous = null; // last tab placed, so later items follow it in order
     for (const url of urls) {
       const data = await resolveDropText(url);
       if (!data || !data.url) continue;
 
-      if (first && targetTab) {
-        loadInExistingTab(targetTab, data, triggeringPrincipal, csp);
-        selectAfter = targetTab;
+      if (!previous && spot.replace) {
+        loadInExistingTab(spot.replace, data, triggeringPrincipal, csp);
+        selectAfter = previous = spot.replace;
         console.log("[stack-mc] drop replaced existing tab");
-      } else {
-        const tab = gBrowser.addTab(data.url, {
-          postData: data.postData,
-          triggeringPrincipal,
-          csp,
-        });
-        const how = adoptToStackEnd(tab, group);
-        selectAfter = tab;
-        console.log("[stack-mc] drop opened in-stack tab via", how);
+        continue;
       }
-      first = false;
+      const tab = gBrowser.addTab(data.url, {
+        postData: data.postData,
+        triggeringPrincipal,
+        csp,
+      });
+      const how = placeInStack(tab, group, previous ? { after: previous } : spot);
+      selectAfter = previous = tab;
+      console.log("[stack-mc] drop opened in-stack tab via", how);
     }
     if (selectAfter) gBrowser.selectedTab = selectAfter;
+  }
+
+  // Move a new tab into `group` at `spot`. moveTabBefore/After insert next to
+  // the target at the DOM level, so the tab joins the target's stack (a split
+  // target resolves to its whole split view).
+  function placeInStack(tab, group, spot) {
+    try {
+      if (spot.before?.group === group) {
+        gBrowser.moveTabBefore(tab, spot.before);
+        return "moveTabBefore";
+      }
+      if (spot.after?.group === group) {
+        gBrowser.moveTabAfter(tab, spot.after);
+        return "moveTabAfter";
+      }
+    } catch (err) {
+      console.warn("[stack-mc] place error", err);
+    }
+    return adoptToStackEnd(tab, group);
   }
 
   // Focus the address bar after opening a blank tab, like native new-tab does
@@ -279,27 +399,39 @@
       console.log("[stack-mc] new in-stack tab via", how);
     }, true);
 
-    // ---- drag text/link onto a stack's tab area ----
-    //   • onto an existing stack tab → replace that tab (search text / load link)
-    //   • onto blank strip area      → open a new in-stack tab, same behavior
-    // …exactly like dropping onto the global tab bar. Floorp doesn't accept text
-    // drops on its stack strip, so we add it. We track whether the drag started
-    // on a visual stack tab (Floorp's own reorder) and stay out of the way for
-    // those.
+    // ---- drag text/link/file onto a stack's tab area ----
+    //   • onto the middle of a stack tab → replace that tab (search text /
+    //     load link)
+    //   • anywhere else → open a new in-stack tab in the gap under the drop
+    //     caret
+    // …exactly like dropping onto the global tab bar. Floorp doesn't accept
+    // these drops on its stack strip, so we add them. We track whether the
+    // drag started on a visual stack tab (Floorp's own reorder) and stay out
+    // of the way for those.
+    const caretStyle = document.createElement("style");
+    caretStyle.textContent = CARET_CSS;
+    document.head.appendChild(caretStyle);
+
     window.addEventListener("dragstart", function (e) {
       internalStackDrag = !!e.target?.closest?.(".floorp-stack-tab");
     }, true);
-    const clearDrag = () => { internalStackDrag = false; };
+    const clearDrag = () => { internalStackDrag = false; hideCaret(); };
     window.addEventListener("dragend", clearDrag, true);
 
     // dragover must preventDefault for the strip to become a valid drop target.
     // Done manually (no browserDragAndDrop dependency) so the drop cursor shows.
     window.addEventListener("dragover", function (e) {
-      if (!e.target.closest?.("#floorp-stack-items")) return;
-      if (!isExternalLinkDrop(e)) return; // reorder / real-tab drag → leave it
+      const strip = e.target.closest?.("#floorp-stack-items");
+      if (!strip || !isExternalLinkDrop(e)) { // reorder / real-tab drag → leave it
+        hideCaret();
+        return;
+      }
       e.preventDefault();
       try { e.dataTransfer.dropEffect = "link"; } catch (err) {}
       e.stopImmediatePropagation();
+      const spot = stackDropSpot(e, strip);
+      if (spot.replace) hideCaret();
+      else showCaret(spot.x);
     }, true);
 
     window.addEventListener("drop", function (e) {
@@ -315,14 +447,11 @@
         return;
       }
 
-      // Dropped onto an existing tab? Replace it; otherwise open a new tab.
-      const overVisual = e.target.closest?.(".floorp-stack-tab");
-      const targetTab = overVisual ? realTabForVisual(overVisual) : null;
-
+      const spot = stackDropSpot(e, strip);
       e.preventDefault();
       e.stopImmediatePropagation();
       clearDrag();
-      handleStackDrop(e, group, targetTab);
+      handleStackDrop(e, group, spot);
     }, true);
 
     console.log("[stack-mc] loaded");

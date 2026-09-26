@@ -49,6 +49,13 @@
 // title, reload, close. The title (and the chip's tab count) gives up that
 // space on hover so it never runs under the buttons. The chip also keeps the
 // arrow cursor, like a global tab, instead of Floorp's pointer.
+//
+// Active tab: clicking a stack opens the tab last viewed in it, including
+// after a restart (see onChipClick), and closing a tab next to a stack
+// switches to that same tab rather than the stack's nearest member.
+//
+// Closing a tab switches to the nearest loaded tab, inside a stack or out,
+// rather than one that has to load first (see refreshSuccessor).
 
 (function () {
   const PROXY_SEL = ".floorp-stack-tab";
@@ -341,6 +348,144 @@
     if (e.type === "click") onAudioButtonClick(btn);
   }
 
+  // Clicking a stack that isn't active opens the tab you last viewed in it.
+  // Floorp remembers that only in memory, so after a restart it opened the
+  // first tab. Firefox's `lastAccessed` (what Ctrl+Tab orders by) survives
+  // restarts via session restore, so the stack's most recently accessed
+  // reachable tab is selected here and the click stops. Floorp's TabSelect
+  // listener then records it and refreshes the chips as usual. A second
+  // click of a double-click finds the stack active and passes through to
+  // Floorp's rename dialog.
+  function onChipClick(e) {
+    if (e.button !== 0) return;
+    const target = e.target;
+    if (target?.closest?.(`.floorp-stack-close, .${AUDIO_BTN}`)) return;
+    const group = target?.closest?.(".tab-group-label-container")
+      ?.closest(`tab-group[${STACK_ATTR}]`);
+    if (!group || gBrowser.selectedTab.group === group) return;
+    const recent = activeTabOf(group);
+    if (!recent) return;
+    e.preventDefault();
+    e.stopPropagation();
+    gBrowser.selectedTab = recent;
+  }
+
+  // The stack's tab you last viewed: its most recently accessed reachable one.
+  const activeTabOf = (group) => group.tabs
+    .filter(t => !t.hidden && !t.closing)
+    .reduce((a, t) => (!a || t.lastAccessed > a.lastAccessed ? t : a), null);
+
+  // ---- Which tab closing the selected tab switches to ----
+  // Closing the selected tab selects its successor if it has one, else
+  // (tabbrowser _findTabToBlurTo) its opener, or the MRU tab when
+  // browser.tabs.selectMRUOnClose is set, or the next visible tab in tab
+  // order, else the previous. The successor is set so closing a tab prefers
+  // the nearest *loaded* tab, instead of dropping you on one that has to
+  // load first (next wins a tie):
+  //   • Inside a stack, Floorp makes the successor the tab's neighbour in the
+  //     stack (next, else previous). It becomes the nearest loaded member,
+  //     falling back to the plain neighbour when no other member is loaded.
+  //   • Outside a stack, it's the nearest loaded tab in tab order, where each
+  //     stack counts as one tab: its active tab. A stack's members are
+  //     consecutive in tab order, so without that a global tab beside a
+  //     stack would fall to the stack's first or last member.
+  //     With no loaded tab around, Firefox's tab order rule applies, still
+  //     with a stack standing for its active tab. The opener and MRU rules
+  //     are left to Firefox.
+  // Other successors are left alone — any set by someone else, apart from
+  // Floorp's in-stack neighbour. Ours are tracked so they can be told apart
+  // and cleared.
+  const ourSuccessors = new WeakMap(); // tab → successor we set
+
+  const isLoaded = (tab) =>
+    !!tab.linkedPanel && !tab.hasAttribute("pending") && !tab.hasAttribute("discarded");
+
+  function closeTargetWithinStack(tab) {
+    const members = tab.group.tabs.filter(t => t === tab || (!t.closing && !t.hidden));
+    const i = members.indexOf(tab);
+    let neighbour = null;
+    for (let d = 1; d < members.length; d++) {
+      for (const t of [members[i + d], members[i - d]]) {
+        if (!t) continue;
+        if (isLoaded(t)) return t;
+        neighbour ??= t;
+      }
+    }
+    return neighbour;
+  }
+
+  const firefoxPicksOwnerOrMRU = (tab) =>
+    (tab.owner?.visible && Services.prefs.getBoolPref("browser.tabs.selectOwnerOnClose", true))
+    || Services.prefs.getBoolPref("browser.tabs.selectMRUOnClose", false);
+
+  function closeTargetGlobal(tab) {
+    if (firefoxPicksOwnerOrMRU(tab)) return null;
+    // Visible tabs in order, each other stack reduced to its active tab.
+    const units = [];
+    let lastStack = null;
+    for (const t of gBrowser.visibleTabs) {
+      if (t !== tab && t.closing) continue;
+      const stack = t !== tab && t.group?.hasAttribute(STACK_ATTR) ? t.group : null;
+      if (stack) {
+        if (stack !== lastStack) units.push(activeTabOf(stack) ?? t);
+      } else {
+        units.push(t);
+      }
+      lastStack = stack;
+    }
+    const i = units.indexOf(tab);
+    for (let d = 1; i >= 0 && d < units.length; d++) {
+      for (const t of [units[i + d], units[i - d]]) {
+        if (t && isLoaded(t)) return t;
+      }
+    }
+    return closeTargetBesideStack(tab);
+  }
+
+  function closeTargetBesideStack(tab) {
+    const remaining = new Set(gBrowser.visibleTabs.filter(t => t !== tab && !t.closing));
+    const filter = t => remaining.has(t);
+    const next = gBrowser.tabContainer.findNextTab(tab, { direction: 1, filter })
+      ?? gBrowser.tabContainer.findNextTab(tab, { direction: -1, filter });
+    const group = next?.group;
+    if (!group || group === tab.group || !group.hasAttribute(STACK_ATTR)) return null;
+    const active = activeTabOf(group);
+    return active !== next ? active : null;
+  }
+
+  function refreshSuccessor() {
+    const tab = gBrowser.selectedTab;
+    if (!tab || tab.closing) return;
+    const ours = ourSuccessors.get(tab);
+    const inStack = !!tab.group?.hasAttribute(STACK_ATTR);
+    const successor = tab.successor;
+    if (successor && successor !== ours && !(inStack && successor.group === tab.group)) return;
+    const pick = inStack ? closeTargetWithinStack(tab) : closeTargetGlobal(tab);
+    if (pick) {
+      if (tab.successor !== pick) gBrowser.setSuccessor(tab, pick);
+      ourSuccessors.set(tab, pick);
+    } else if (ours) {
+      gBrowser.setSuccessor(tab, null);
+      ourSuccessors.delete(tab);
+    }
+  }
+
+  // Runs after the event's other listeners (Floorp sets its successors
+  // synchronously) and once per burst of events.
+  let successorQueued = false;
+  function scheduleSuccessor() {
+    if (successorQueued) return;
+    successorQueued = true;
+    Promise.resolve().then(() => {
+      successorQueued = false;
+      try {
+        refreshSuccessor();
+      } catch (e) {
+        console.error("[stack-general-improvements] close successor:", e);
+      }
+    });
+  }
+
   function init() {
     const style = document.createElement("style");
     style.textContent = CSS;
@@ -366,6 +511,18 @@
     for (const type of ["mousedown", "click", "dblclick"]) {
       window.windowRoot.addEventListener(type, onPress, true);
     }
+    window.windowRoot.addEventListener("click", onChipClick, true);
+
+    // Anything that changes the selected tab, its neighbours, or whether
+    // they're loaded.
+    for (const type of ["TabSelect", "TabOpen", "TabClose", "TabMove", "TabShow", "TabHide",
+                        "TabGrouped", "TabUngrouped", "TabBrowserInserted", "TabBrowserDiscarded"]) {
+      gBrowser.tabContainer.addEventListener(type, scheduleSuccessor);
+    }
+    gBrowser.tabContainer.addEventListener("TabAttrModified", (e) => {
+      if (e.detail?.changed?.some(a => a === "pending" || a === "discarded")) scheduleSuccessor();
+    });
+    scheduleSuccessor();
 
     syncAll();
     console.log("[stack-general-improvements] loaded");

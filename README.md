@@ -2,7 +2,9 @@
 The tab stack implementation leaves a lot to be desired. They're clunky and frustrating to use. With the help of ~~vibecoding~~ Agentic Enginnering I've created a set of userscripts (and an optional stylesheet) to make tab stacks practical. The end goal is to make tab stacks as seamless and practical as global tabs, like Vivaldi. **The scripts and stylesheet are modular and self-contained, pick and choose what to add.**
 
 # Recommended
-**stacktab-mouse-improvements.uc.js** - The single biggest improvement. Context-aware middle click to close tabs or open a new one. New tabs will open in the stack or global tabs depending on where you click, fixes opening on right click, as well as drag and drop support for text/images/whatever. Dragging tabs from other windows aren't yet supported, but planned.
+**stacktab-global-drag-fix.uc.js** - Highly recommended. Fixes the dragging of stacks and tabs on the global tab bar. Tabs and stacks can be moved around smoothly without ordering and merge issues. Fixes tabs being merged with stacks when placed after it. Fixes stack tabs so they can be placed between stacks.
+
+**stacktab-mouse-improvements.uc.js** - Context-aware middle click to close tabs or open a new one. New tabs will open in the stack or global tabs depending on where you click, fixes opening on right click, as well as drag and drop support for text/images/whatever. Dragging tabs from other windows aren't yet supported, but planned.
 
 **stacktab-hotkey-opens-in-stack.uc.js** - Makes the new tab hotkey & gesture context-aware. New tabs are opened in the currently active stack or in the global tab area, depending on which you're using.
 
@@ -11,6 +13,14 @@ The tab stack implementation leaves a lot to be desired. They're clunky and frus
 **stacktab-overflow-scroll-speed.uc.js** - Scrolling overflowed tabs within a stack was frustratingly slow. This script makes scrolling behave like the global tabs.
 
 **stacktab-drag-edge-scroll.uc.js** - Allows stack area to auto-scroll while dragging tabs to the edge. Also adds continuous scroll while holding left click on the arrows.
+
+**stacktab-multiselect.uc.js** - Allows selecting multiple tabs from stacks. Useful with stacktab-move-to-group and stacktab-auto-title.
+
+**stacktab-auto-title.uc.js** - When you create a stack the "Manage Stack" options won't automatically appear and stacks will show the name of their active tab. You can still change the name manually, makes stacks vivaldi-like, useful with stacktab-multiselect.uc.js and stacktab-move-to-group-menu.uc.js
+
+**stacktab-move-to-group-menu.uc.js** - Enables the "Add Tab to Group" option to stack tabs.
+
+**stacktab-container-line.uc.js** - Shows the container color under stack tabs like on global tabs.
  
 **stacktab-newtab-expand-animation.uc.js** - Adds the opening animation to stack tabs. Purely cosmetic but adds missing polish.
 

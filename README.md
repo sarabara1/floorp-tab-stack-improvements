@@ -6,6 +6,8 @@ The tab stack implementation leaves a lot to be desired. They're clunky and frus
 
 **stacktab-mouse-improvements.uc.js** - Context-aware middle click on empty tab bar space to open a new tab. New tabs will open in the stack or global tabs depending on where you click, as well as drag and drop support for text/images/whatever. Dragging tabs from other windows aren't yet supported, but planned.
 
+**stacktab-general-improvements.uc.js** - Makes stacks and stack tabs look and act more like global tabs. Shows the container color under stack tabs, adds the audio button with click to mute/unmute, moves the close button to the right side, and removes the pointer cursor from stacks.
+
 **stacktab-hotkey-opens-in-stack.uc.js** - Makes the new tab hotkey & gesture context-aware. New tabs are opened in the currently active stack or in the global tab area, depending on which you're using.
 
 **stacktab-inline-newtab-button.uc.js** - Moves the stack's new tab button to the right end of your tabs just like in the global area. It will snap to the window when the tabs overflow like global tabs.
@@ -19,8 +21,6 @@ The tab stack implementation leaves a lot to be desired. They're clunky and frus
 **stacktab-auto-title.uc.js** - When you create a stack the "Manage Stack" options won't automatically appear and stacks will show the name of their active tab. You can still change the name manually, makes stacks vivaldi-like, useful with stacktab-multiselect.uc.js and stacktab-move-to-group-menu.uc.js
 
 **stacktab-move-to-group-menu.uc.js** - Enables the "Add Tab to Group" option to stack tabs.
-
-**stacktab-container-line.uc.js** - Shows the container color under stack tabs like on global tabs.
  
 **stacktab-newtab-expand-animation.uc.js** - Adds the opening animation to stack tabs. Purely cosmetic but adds missing polish.
 

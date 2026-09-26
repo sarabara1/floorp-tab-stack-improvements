@@ -1,12 +1,19 @@
 # Floorp Tab Stack Improvements 
 The tab stack implementation leaves a lot to be desired. They're clunky and frustrating to use. With the help of ~~vibecoding~~ Agentic Enginnering I've created a set of userscripts (and an optional stylesheet) to make tab stacks practical. The end goal is to make tab stacks as seamless and practical as global tabs, like Vivaldi. **The scripts and stylesheet are modular and self-contained, pick and choose what to add.**
 
-# Recommended
+# Bug Fixes
+
+**stacktab-general-fixes.uc.js** - Fixes tab context menu entries showing only their icons, with no text, when the browser starts on a stack tab. Fixes a second window sometimes opening with its stacks turned into plain tab groups and no option to change them back.
+
 **stacktab-global-drag-fix.uc.js** - Highly recommended. Fixes the dragging of stacks and tabs on the global tab bar. Tabs and stacks can be moved around smoothly without ordering and merge issues. Fixes tabs being merged with stacks when placed after it. Fixes stack tabs so they can be placed between stacks.
+
+**floorp-sidebar-resize-fix.us.css** - Fixes unresizable sidebar when using some default Floorp themes.
+
+# Recommended
 
 **stacktab-mouse-improvements.uc.js** - Context-aware middle click on empty tab bar space to open a new tab. New tabs will open in the stack or global tabs depending on where you click, as well as drag and drop support for text/images/whatever. Dragging tabs from other windows aren't yet supported, but planned.
 
-**stacktab-general-improvements.uc.js** - Makes stacks and stack tabs look and act more like global tabs. Shows the container color under stack tabs, adds the audio button with click to mute/unmute, moves the close button to the right side, and removes the pointer cursor from stacks.
+**stacktab-general-improvements.uc.js** - Makes stacks and stack tabs look and act more like global tabs. Shows the container color under stack tabs, adds the audio button with click to mute/unmute, moves the close button to the right side, removes the pointer cursor from stacks, remembers each stack's active tab across restarts, switches to a stack's active tab when you close the tab next to it, and closing a tab switches to the nearest loaded tab (in a stack or in the global tabs) instead of one that still has to load.
 
 **stacktab-hotkey-opens-in-stack.uc.js** - Makes the new tab hotkey & gesture context-aware. New tabs are opened in the currently active stack or in the global tab area, depending on which you're using.
 
@@ -18,13 +25,16 @@ The tab stack implementation leaves a lot to be desired. They're clunky and frus
 
 **stacktab-multiselect.uc.js** - Allows selecting multiple tabs from stacks. Useful with stacktab-move-to-group and stacktab-auto-title.
 
-**stacktab-auto-title.uc.js** - When you create a stack the "Manage Stack" options won't automatically appear and stacks will show the name of their active tab. You can still change the name manually, makes stacks vivaldi-like, useful with stacktab-multiselect.uc.js and stacktab-move-to-group-menu.uc.js
-
 **stacktab-move-to-group-menu.uc.js** - Enables the "Add Tab to Group" option to stack tabs.
+
+**stacktab-hover-preview.uc.js** - Replaces the tooltip with hover previews for stack tabs.
  
 **stacktab-newtab-expand-animation.uc.js** - Adds the opening animation to stack tabs. Purely cosmetic but adds missing polish.
 
-# Optional
+# Optional Features
+
+**stacktab-auto-title.uc.js** - When you create a stack the "Manage Stack" options won't automatically appear and stacks will show the name of their active tab. You can still change the name manually, makes stacks vivaldi-like, useful with stacktab-multiselect.uc.js and stacktab-move-to-group-menu.uc.js
+
 **stacktab-close-confirm.uc.js** - Adds a dialog when closing a stack or group if it contains multiple tabs just like windows if "Ask before closing multiple tabs" is enabled in your settings.
 
 **stacktab-unload-context-menu-item.uc.js** - Adds a context menu item for stacks and groups to unload the tabs they contain.
@@ -36,8 +46,6 @@ The tab stack implementation leaves a lot to be desired. They're clunky and frus
 **floorp-about-page-singletons.uc.js** - This is the odd one out. It makes the Floorp hub a singleton like the rest of the about: pages. This makes them open in the global tabs and the browser will prefer to switch to existing hubs instead of opening a new one. Simply adds cohesion with the rest of Firefox.
 
 **stackktab-compact-stacks.uc.css** - Makes stacks a bit more compact, between the width of a group and normal tab. Great if you like to have a bunch of assorted stacks.
-
-**floorp-sidebar-resize-fix.us.css** - Fixes unresizable sidebar when using some default Floorp themes.
 
 # Installation
 

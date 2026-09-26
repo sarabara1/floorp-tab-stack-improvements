@@ -1,5 +1,5 @@
 // ==UserScript==
-// @name           Stack tab improvements: middle-click close + new-tab placement + drag-text-to-search
+// @name           Stack tab improvements: middle-click new tab + drag-text-to-search
 // @include        main
 // ==/UserScript==
 
@@ -200,32 +200,11 @@
   }
 
   function init() {
-    // ---- click: handle stack-tab middle/right BEFORE the stack selects ----
-    // The stack selects a tab on `click` (confirmed via probe: TabSelect
-    // fires after click). So we intercept click in capture phase and stop
-    // the select for middle/right, eliminating the flicker.
+    // ---- click: middle-click on the blank global tab-bar area ----
+    // (Floorp itself handles middle-click-to-close and right-click on stack
+    // tabs.)
     window.addEventListener("click", function (e) {
       const stackTab = e.target.closest?.(".floorp-stack-tab");
-
-      // --- stack tab: middle-click closes, no flicker ---
-      if (stackTab && e.button === 1) {
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        const dragId = stackTab.getAttribute("data-floorp-drag-id");
-        const tab = dragId && gBrowser.tabs.find(
-          t => t.getAttribute("data-floorp-tab-id") === dragId
-        );
-        if (tab) gBrowser.removeTab(tab, { animate: true });
-        else console.warn("[stack-mc] no tab for", dragId);
-        return;
-      }
-
-      // --- stack tab: right-click should NOT switch to the tab ---
-      if (stackTab && e.button === 2) {
-        // block only the select; contextmenu event still fires separately
-        e.stopImmediatePropagation();
-        return;
-      }
 
       // --- regular blank tab-bar area: new tab at GLOBAL END + focus it ---
       if (e.button === 1
@@ -260,7 +239,7 @@
     // group at the stack's end.
     window.addEventListener("auxclick", function (e) {
       if (e.button !== 1) return;
-      if (e.target.closest?.(".floorp-stack-tab")) return; // handled on click now
+      if (e.target.closest?.(".floorp-stack-tab")) return; // Floorp closes it
       const stackBlank = e.target.closest?.("#floorp-stack-items");
       if (!stackBlank) return;
 
